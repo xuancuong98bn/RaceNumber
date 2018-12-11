@@ -1,0 +1,137 @@
+laneWidth = 50
+
+    minVelocity = 10
+    maxVelocity = 50
+
+    preError
+
+    kP
+    kI
+    kD
+
+    t_kP
+    t_kI
+    t_kD
+    def driverCar(&left, &right, velocity):
+        i = left.size() - 11
+        error = preError
+        while (left[i] == DetectLane::null and right[i] == DetectLane::null) {
+            i = i -1
+            if (i < 0) return
+        }
+        if (left[i] != DetectLane::null and right[i] !=  DetectLane::null)
+        {
+            error = errorAngle((left[i] + right[i]) / 2)
+        } 
+        else if (left[i] != DetectLane::null)
+        {
+            error = errorAngle(left[i] + Point(laneWidth / 2, 0))
+        }
+        else
+        {
+            error = errorAngle(right[i] - Point(laneWidth / 2, 0))
+        }
+
+        std_msgs::Float32 angle
+        std_msgs::Float32 speed
+
+        angle.data = error
+        speed.data = velocity
+
+        rospy.loginfo(hello_str)
+        rospy.loginfo(hello_str)
+
+        steer_publisher.publish(angle)
+        speed_publisher.publish(speed)   
+    
+
+
+
+
+
+#!/usr/bin/env python
+
+# The above line is essential for ros python file
+
+import sys, time
+import numpy as np
+
+# import ros libraries
+import rospy
+import roslib
+
+# import opencv
+import cv2
+
+# import file header
+
+
+# import type CompressedImage from sensor_msgs
+from sensor_msgs.msg import CompressedImage
+
+class CarControl:
+    carPos.x = 120
+    carPos.y = 300
+
+    # constructor
+    def __init__(self):
+        
+        self.steer_publisher = rospy.Publisher('Team1_steerAngle', Float32, queue_size=10)
+        self.speed_publisher = rospy.Publisher('Team1_speed', Float32, queue_size=10)
+        self.subscriber = rospy.Subscriber("/Team1_image/compressed", CompressedImage, self.callback, queue_size = 1)
+
+    # errorAngle
+    def errorAngle(self, &dst)
+    {
+        if (dst.x == carPos.x) return 0
+        if (dst.y == carPos.y) return (-90 if dst.x < carPos.x else 90)
+        pi = acos(-1.0)
+        dx = dst.x - carPos.x
+        dy = carPos.y - dst.y
+        if (dx < 0) return -atan(-dx / dy) * 180 / pi
+        return atan(dx / dy) * 180 / pi
+    }
+
+
+    # callback function for processing image
+    def callback(self, ros_data):
+        # convert CompressedImage to int array
+        np_arr = np.fromstring(ros_data.data, np.uint8)
+
+        # decode image
+        image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
+        # show the decoded image
+        cv2.imshow('cv_img', image_np)
+
+        # show gray image
+        image_gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+        cv2.imshow('cv_gray_img',image_gray)
+
+        hsv = cv2.cvtColor(image_np, cv2.COLOR_RGB2HSV)
+
+        lower_range = np.array([0,0,0])
+        upper_range = np.array([0,0,255])
+
+        threshold_image = cv2.inRange(hsv, lower_range, upper_range)
+
+        cv2.imshow('threshold_image', threshold_image)
+
+        res = cv2.bitwise_and(image_np, image_np, mask= threshold_image)
+        cv2.imshow('res_image',res)
+
+        # cv2.imwrite()
+
+        cv2.waitKey(2)
+
+def main(args):
+    ic = Carcontrol()
+    rospy.init_node('CarControl', anonymous=True)
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print "Closing"
+    cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main(sys.argv)
