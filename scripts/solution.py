@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 # import ros libraries
 import rospy
 import roslib
+import Line
 
 # import opencv
 import cv2
@@ -17,11 +18,14 @@ import cv2
 from sensor_msgs.msg import CompressedImage
 
 class Detected_Lane:
-    
+    leftLine = Line.Line()
+    rightLine = Line.Line()
+
     # constructor
     def __init__(self):
         
         self.subscriber = rospy.Subscriber("/Team1_image/compressed", CompressedImage, self.callback, queue_size = 1)
+        
 
     def cannny(self, warped):
         # canny edges
@@ -55,16 +59,17 @@ class Detected_Lane:
         # If found, add object points, image points to the lists
         if ret == True:
             objpoints.append(objp)
-            corners2 = cv2.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
+            # corners2 = cv2.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
             imgpoints.append(corners)
             
             # Draw and display the corners
-            # img = cv2.drawChessboardCorners(img, (9,6), corners, ret)
-        if objpoints and imgpoints: 
-            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
-            undist = self.undistort(img, mtx, dist)
-            return undist
-        return gray
+            img = cv2.drawChessboardCorners(img, (9,6), corners, ret)
+
+        # if objpoints and imgpoints: 
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+        undist = self.undistort(img, mtx, dist)
+        return undist
+        # return gray
 
     def add_points(img, src):
         img2 = np.copy(img)
@@ -254,6 +259,33 @@ class Detected_Lane:
         combined_binary = r + s + b + l + edge
         return combined_binary
 
+    def compute_hls_white_yellow_binary(rgb_img):
+        """
+        Returns a binary thresholded image produced retaining only white and yellow elements on the picture
+        The provided image should be in RGB format
+        """
+        hls_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HLS)
+        
+        # Compute a binary thresholded image where yellow is isolated from HLS components
+        img_hls_yellow_bin = np.zeros_like(hls_img[:,:,0])
+        img_hls_yellow_bin[((hls_img[:,:,0] >= 15) & (hls_img[:,:,0] <= 35))
+                    & ((hls_img[:,:,1] >= 30) & (hls_img[:,:,1] <= 204))
+                    & ((hls_img[:,:,2] >= 115) & (hls_img[:,:,2] <= 255))                
+                    ] = 1
+        
+        # Compute a binary thresholded image where white is isolated from HLS components
+        img_hls_white_bin = np.zeros_like(hls_img[:,:,0])
+        img_hls_white_bin[((hls_img[:,:,0] >= 0) & (hls_img[:,:,0] <= 255))
+                    & ((hls_img[:,:,1] >= 200) & (hls_img[:,:,1] <= 255))
+                    & ((hls_img[:,:,2] >= 0) & (hls_img[:,:,2] <= 255))                
+                    ] = 1
+        
+        # Now combine both
+        img_hls_white_yellow_bin = np.zeros_like(hls_img[:,:,0])
+        img_hls_white_yellow_bin[(img_hls_yellow_bin == 1) | (img_hls_white_bin == 1)] = 1
+
+        return img_hls_white_yellow_bin
+
     def splitShadow(self, img):
         thresh=(40, 255)
         out = self.applyThreshold(img, thresh)
@@ -364,22 +396,22 @@ class Detected_Lane:
         image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
         SKY_LINE = 90
-        CAR_LINE = 30
+        CAR_LINE = 15
         HALF_ROAD = 30
         height,width = image_np.shape[:2]
         IMAGE_H = height - SKY_LINE - CAR_LINE
         IMAGE_W = width
 
-        SRC_W1 = IMAGE_W/2 - HALF_ROAD
-        SRC_W2 = IMAGE_W/2 + HALF_ROAD
+        SRC_W1 = IMAGE_W/2 - HALF_ROAD/2
+        SRC_W2 = IMAGE_W/2 + HALF_ROAD/2
 
         IMAGE_W1_TF = IMAGE_W/2 - HALF_ROAD
         IMAGE_W2_TF = IMAGE_W/2 + HALF_ROAD
         IMAGE_W3_TF = 0 - HALF_ROAD - 10
         IMAGE_W4_TF = IMAGE_W + HALF_ROAD + 10
 
-        src = np.float32([[0, IMAGE_H], [IMAGE_W, IMAGE_H], [0, 0], [IMAGE_W, 0]])
-        dst = np.float32([[IMAGE_W1_TF, height], [IMAGE_W2_TF, height], [IMAGE_W3_TF, 0], [IMAGE_W4_TF, 0]])
+        src = np.float32([[SRC_W1, 0], [SRC_W2, 0], [0, IMAGE_H], [width, IMAGE_H]])
+        dst = np.float32([[IMAGE_W1_TF+12, 0], [IMAGE_W2_TF-12, 0], [IMAGE_W1_TF, height], [IMAGE_W2_TF, height]])
         image = image_np[SKY_LINE:(SKY_LINE+IMAGE_H-CAR_LINE), 0:IMAGE_W] # Apply np slicing for ROI crop
 
         warper_img = self.warper(image, src, dst)
@@ -387,6 +419,9 @@ class Detected_Lane:
 
         binHSV = self.binary_HSV(warper_img)
         cv2.imshow('binHSV', binHSV)
+
+        # binHSL = self.compute_hls_white_yellow_binary(warper_img)
+        # cv2.imshow('binHSL', binHSL)
 
         sobel_img = self.calc_sobel(warper_img)
         cv2.imshow('sobel_img', sobel_img)
@@ -408,6 +443,9 @@ class Detected_Lane:
 
         # test_img = cv2.bitwise_and(canny_img, combined_img)
         left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(test1_img)
+        
+        self.leftLine.__add_new_fit__(left_fit, left_fit_m)
+        self.rightLine.__add_new_fit__(right_fit, left_fit_m)
         cv2.imshow('out_img', out_img)
 
         cv2.waitKey(2)
