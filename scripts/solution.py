@@ -34,7 +34,7 @@ class Detected_Lane:
         undist = cv2.undistort(img, mtx, dist, None, mtx)
         return undist
 
-    def Camera_Calibration(self, img):
+    def camera_Calibration(self, img):
         # termination criteria
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
@@ -161,10 +161,10 @@ class Detected_Lane:
     def applyThreshold(self, channel, thresh):
         # Create an image of all zeros
         # binary_output = np.zeros_like(channel)
-        binary_output = np.copy(channel)
+        # binary_output = np.copy(channel)
         # Apply a threshold to the channel with inclusive thresholds 
         # binary_output[(channel >= thresh[0]) & (channel <= thresh[1])] = 1
-        retval, threshold = cv2.threshold(binary_output, thresh[0], thresh[1], cv2.THRESH_BINARY)
+        retval, threshold = cv2.threshold(channel, thresh[0], thresh[1], cv2.THRESH_BINARY)
         return threshold
 
     # RGB R threshold
@@ -230,10 +230,15 @@ class Detected_Lane:
         ### COLOR SELECTION
         # Get the Red and saturation images
         r = self.rgb_rthresh(warped, thresh=(r_thresh_low, r_thresh_high))
+        # cv2.imshow('r', r)
         s = self.hls_sthresh(warped, thresh=(s_thresh_low, s_thresh_high))
+        # cv2.imshow('s', s)
         b = self.lab_bthresh(warped, thresh=(b_thresh_low, b_thresh_high))
+        # cv2.imshow('b', b)
         l = self.luv_lthresh(warped, thresh=(l_thresh_low, l_thresh_high))
+        # cv2.imshow('l', l)
         v = self.hsv_vthresh(warped)
+        # cv2.imshow('v', v)
 
         ### EDGE DETECTION
         # Run the sobel magnitude calculation
@@ -249,7 +254,17 @@ class Detected_Lane:
         combined_binary = r + s + b + l + edge
         return combined_binary
 
-    
+    def splitShadow(self, img):
+        thresh=(40, 255)
+        out = self.applyThreshold(img, thresh)
+        return out
+
+    def binary_HSV(self, img):
+        minThreshold = (0, 0, 180);
+        maxThreshold = (179, 30, 255);
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+        out = cv2.inRange(hsv_img, minThreshold, maxThreshold, cv2.THRESH_BINARY)
+        return out
 
     def calc_line_fits(self, img):
 
@@ -349,10 +364,15 @@ class Detected_Lane:
         image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
         SKY_LINE = 90
+        CAR_LINE = 30
         HALF_ROAD = 30
         height,width = image_np.shape[:2]
-        IMAGE_H = height-SKY_LINE
+        IMAGE_H = height - SKY_LINE - CAR_LINE
         IMAGE_W = width
+
+        SRC_W1 = IMAGE_W/2 - HALF_ROAD
+        SRC_W2 = IMAGE_W/2 + HALF_ROAD
+
         IMAGE_W1_TF = IMAGE_W/2 - HALF_ROAD
         IMAGE_W2_TF = IMAGE_W/2 + HALF_ROAD
         IMAGE_W3_TF = 0 - HALF_ROAD - 10
@@ -360,95 +380,35 @@ class Detected_Lane:
 
         src = np.float32([[0, IMAGE_H], [IMAGE_W, IMAGE_H], [0, 0], [IMAGE_W, 0]])
         dst = np.float32([[IMAGE_W1_TF, height], [IMAGE_W2_TF, height], [IMAGE_W3_TF, 0], [IMAGE_W4_TF, 0]])
-        image = image_np[SKY_LINE:(SKY_LINE+IMAGE_H), 0:IMAGE_W] # Apply np slicing for ROI crop
+        image = image_np[SKY_LINE:(SKY_LINE+IMAGE_H-CAR_LINE), 0:IMAGE_W] # Apply np slicing for ROI crop
 
         warper_img = self.warper(image, src, dst)
         cv2.imshow('warper_img', warper_img)
 
+        binHSV = self.binary_HSV(warper_img)
+        cv2.imshow('binHSV', binHSV)
+
         sobel_img = self.calc_sobel(warper_img)
         cv2.imshow('sobel_img', sobel_img)
+
+        splitShadow_img = self.splitShadow(sobel_img)
+        cv2.imshow('splitShadow_img', splitShadow_img)
 
         canny_img = self.run_canny(warper_img)
         cv2.imshow('canny_img', canny_img)
 
-        combined_img = self.binaryPipeline(warper_img, show_images=True)
-        cv2.imshow('combined_img', combined_img)
+        canny_splSd_img = np.bitwise_and(splitShadow_img, canny_img)
+        canny_bin_img = np.bitwise_and(binHSV, canny_img)
+        test1_img = canny_splSd_img + binHSV
+        cv2.imshow('test_img', test1_img)
+        cv2.imshow('canny_bin_img', canny_bin_img)
 
-        test_img = cv2.bitwise_and(canny_img, combined_img)
-        left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(combined_img)
+        # combined_img = self.binaryPipeline(warper_img, show_images=True)
+        # cv2.imshow('combined_img', combined_img)
+
+        # test_img = cv2.bitwise_and(canny_img, combined_img)
+        left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(test1_img)
         cv2.imshow('out_img', out_img)
-
-        # show the decoded image
-        # cv2.imshow('cv_img', image_np)
-
-        #############################################################
-
-        # show gray image
-        # image_gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
-        # cv2.imshow('image_gray',image_gray)
-
-        #  gray and gaussian edges
-        # img_hsv = cv2.cvtColor(image_np, cv2.COLOR_BGR2HSV)
-
-        # lower_yellow = np.array([20, 100, 100], dtype = "uint8")
-        # upper_yellow = np.array([30, 255, 255], dtype="uint8")
-
-        # mask_yellow = cv2.inRange(img_hsv, lower_yellow, upper_yellow)
-        # mask_white = cv2.inRange(image_gray, 200, 255)
-        # mask_yw = cv2.bitwise_or(mask_white, mask_yellow)
-        # mask_yw_image = cv2.bitwise_and(image_gray, mask_yw)
-
-        # kernel_size = 3
-        # gauss_gray = cv2.GaussianBlur(mask_yw_image, (kernel_size, kernel_size), 0)
-
-        # show birdview
-        # SKY_LINE = 90
-        # HALF_ROAD = 20
-        # image = gauss_gray
-        # height,width = image.shape[:2]
-        # IMAGE_H = height-SKY_LINE
-        # IMAGE_W = width
-        # IMAGE_W1_TF = IMAGE_W/2 - HALF_ROAD
-        # IMAGE_W2_TF = IMAGE_W/2 + HALF_ROAD
-
-        # src = np.float32([[0, IMAGE_H], [IMAGE_W, IMAGE_H], [0, 0], [IMAGE_W, 0]])
-        # dst = np.float32([[IMAGE_W1_TF, height], [IMAGE_W2_TF, height], [0, 0], [IMAGE_W, 0]])
-        # M = cv2.getPerspectiveTransform(src, dst) # The transformation matrix
-        # Minv = cv2.getPerspectiveTransform(dst, src) # Inverse transformation
-
-        # polys = np.array([[0, IMAGE_H], [0, 0], [IMAGE_W, 0], [IMAGE_W, IMAGE_H], [0, IMAGE_H]])
-        # ROI_Full = cv2.fillPoly(image, polys, np.array([0,0,0]), lineType=8, shift=0)
-        # cv2.imshow('ROI_Full', ROI_Full)
-        # image = image[SKY_LINE:(SKY_LINE+IMAGE_H), 0:IMAGE_W] # Apply np slicing for ROI crop
-        # cv2.imshow('ROI', image)
-        # warped = cv2.warpPerspective(image, M, (IMAGE_W, height)) # Image warping
-        # cv2.imshow('bird_view', warped)
-        # plt.imshow(cv2.cvtColor(warped_img, cv2.COLOR_BGR2RGB)) # Show results
-        # plt.show()
-
-        # show binary
-        # ret, image_binary = cv2.threshold(image_gray, 200, 255, cv2.THRESH_BINARY)
-        # cv2.imshow('image_binary',image_binary)
-        
-        # canny edges
-        # low_threshold = 20
-        # high_threshold = 150
-        # canny_edges = cv2.Canny(warped_img,low_threshold,high_threshold)
-        # cv2.imshow("canny_edges", canny_edges)
-        # canny_edges = self.cannny(warped)
-        # cv2.imshow("canny_edges", canny_edges)
-
-        # lower_range = np.array([0,0,0])
-        # upper_range = np.array([0,0,255])
-
-        # threshold_image = cv2.inRange(img_hsv, lower_range, upper_range)
-
-        # cv2.imshow('threshold_image', threshold_image)
-
-        # res = cv2.bitwise_and(image_np, image_np, mask= threshold_image)
-        # cv2.imshow('res_image',res)
-
-        # cv2.imwrite()
 
         cv2.waitKey(2)
 

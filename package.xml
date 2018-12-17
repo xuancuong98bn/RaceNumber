@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>RaceNumber</name>
+  <name>raceNumber</name>
   <version>0.0.0</version>
-  <description>The RaceNumber package</description>
+  <description>The raceNumber package</description>
 
   <maintainer email="xuancuong98bn@gmail.com">xuancuong</maintainer>
   <license>TODO</license>
