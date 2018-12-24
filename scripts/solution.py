@@ -298,6 +298,24 @@ class Detected_Lane:
         out = cv2.inRange(hsv_img, minThreshold, maxThreshold, cv2.THRESH_BINARY)
         return out
 
+    def shadow_HSV(self, img):
+        minShadowTh = (90, 43, 36)
+        maxShadowTh = (120, 81, 171)
+
+        minLaneInShadow = (90, 43, 97)
+        maxLaneInShadow = (120, 80, 171)
+
+        imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV);
+
+        shadowMask = cv2.inRange(imgHSV, minShadowTh, maxShadowTh)
+
+        shadow = cv2.bitwise_and(img,img, mask= shadowMask)
+
+        shadowHSV = cv2.cvtColor(shadow, cv2.COLOR_BGR2HSV);
+
+        out = cv2.inRange(shadowHSV, minLaneInShadow, maxLaneInShadow)
+        return out
+
     def calc_line_fits(self, img):
 
         ym_per_pix = 3*8/720 # meters per pixel in y dimension, 8 lines (5 spaces, 3 lines) at 10 ft each = 3m
@@ -420,6 +438,12 @@ class Detected_Lane:
         binHSV = self.binary_HSV(warper_img)
         cv2.imshow('binHSV', binHSV)
 
+        shadow = self.shadow_HSV(warper_img)
+        cv2.imshow('shadow', shadow)
+
+        test2_img = binHSV + shadow
+        cv2.imshow('test2_img', test2_img)
+
         # binHSL = self.compute_hls_white_yellow_binary(warper_img)
         # cv2.imshow('binHSL', binHSL)
 
@@ -438,14 +462,17 @@ class Detected_Lane:
         cv2.imshow('test_img', test1_img)
         cv2.imshow('canny_bin_img', canny_bin_img)
 
+        result_img = np.bitwise_and(splitShadow_img, test2_img)
+        cv2.imshow('result_img', result_img)
+
         # combined_img = self.binaryPipeline(warper_img, show_images=True)
         # cv2.imshow('combined_img', combined_img)
 
         # test_img = cv2.bitwise_and(canny_img, combined_img)
-        left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(test1_img)
+        left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(test2_img)
         
-        self.leftLine.__add_new_fit__(left_fit, left_fit_m)
-        self.rightLine.__add_new_fit__(right_fit, left_fit_m)
+        # self.leftLine.__add_new_fit__(left_fit, left_fit_m)
+        # self.rightLine.__add_new_fit__(right_fit, left_fit_m)
         cv2.imshow('out_img', out_img)
 
         cv2.waitKey(2)

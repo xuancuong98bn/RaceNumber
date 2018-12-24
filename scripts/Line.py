@@ -37,7 +37,7 @@ class Line():
         
         # camera position is where the camera is located relative to the image
         # we're assuming it's in the middle
-        self.camera_position = 640.
+        self.camera_position = 155.
 
     def run_line_pipe(self):
         self.calc_best_fit()
