@@ -8,58 +8,71 @@ import numpy as np
 # import ros libraries
 import rospy
 import roslib
+import detectlane
 
 # import opencv
 import cv2
 
+from std_msgs.msg import Float32
+
 # import type CompressedImage from sensor_msgs
 from sensor_msgs.msg import CompressedImage
 
-class ImageGetter:
+class CarControl:
+    carPos = (0., 0.)
+    preError = 0
+    laneWidth = 50
+
     # constructor
     def __init__(self):
         
-        self.subscriber = rospy.Subscriber("/Team1_image/compressed", CompressedImage, self.callback, queue_size = 1)
+        self.carPos = (120., 300.)
+        self.steer_publisher = rospy.Publisher('Team1_steerAngle', Float32, queue_size=10)
+        self.speed_publisher = rospy.Publisher('Team1_speed', Float32, queue_size=10)
 
-    # callback function for processing image
-    def callback(self, ros_data):
-        # convert CompressedImage to int array
-        np_arr = np.fromstring(ros_data.data, np.uint8)
+    def errorAngle(self, dst):
+        if (dst[0] == self.carPos[0]):
+            return 0
+        if (dst[1] == self.carPos[1]):
+            return -90 if dst[0] < self.carPos[0] else 90
+        pi = np.arccos(-1.0)
+        dx = dst[0] - self.carPos[0]
+        dy = self.carPos[1] - dst[1] 
+        if (dx < 0):
+            return - np.arctan(-dx / dy) * 180 / pi
+        return np.arctan(dx / dy) * 180 / pi;
+    
 
-        # decode image
-        image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        
-        # show the decoded image
-        cv2.imshow('cv_img', image_np)
+    def driverCar(self, velocity = 20):
+        # i = len(left) - 11
+        # error = self.preError
+        # while not left[i] and not right[i]:
+        #     i = i -1
+        #     if (i < 0):
+        #         return
+        # if (left[i] and right[i]):
+        #     error = self.errorAngle((left[i] + right[i]) / 2);
+        # elif left[i]:
+        #     error = self.errorAngle(left[i] + (self.laneWidth / 2, 0));
+        # else:
+        #     error = self.errorAngle(right[i] - (self.laneWidth / 2, 0));
 
-        # show gray image
-        image_gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
-        cv2.imshow('cv_gray_img',image_gray)
+        # angle = error;
+        speed = velocity;
 
-        hsv = cv2.cvtColor(image_np, cv2.COLOR_RGB2HSV)
-
-        lower_range = np.array([0,0,0])
-        upper_range = np.array([0,0,255])
-
-        threshold_image = cv2.inRange(hsv, lower_range, upper_range)
-
-        cv2.imshow('threshold_image', threshold_image)
-
-        res = cv2.bitwise_and(image_np, image_np, mask= threshold_image)
-        cv2.imshow('res_image',res)
-
-        # cv2.imwrite()
-
-        cv2.waitKey(2)
+        self.steer_publisher.publish(0);
+        self.speed_publisher.publish(10);    
 
 def main(args):
-    ic = ImageGetter()
-    rospy.init_node('ImageGetter', anonymous=True)
-    try:
-        rospy.spin()
-    except KeyboardInterrupt:
-        print "Closing"
-    cv2.destroyAllWindows()
+    rospy.init_node('carcontrol', anonymous=True)
+    rate = rospy.Rate(10)
+    cc = CarControl()
+    while not rospy.is_shutdown():
+        cc.driverCar()
+        rate.sleep()
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except rospy.ROSInterruptException:
+        pass

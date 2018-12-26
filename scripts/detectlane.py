@@ -79,7 +79,7 @@ class Detected_Lane:
         # Set the width of the windows +/- margin
         margin = 20
         # Set minimum number of pixels found to recenter window
-        minpix = 10
+        minpix = 5
 
 
         # Take a histogram of the bottom half of the image
@@ -194,40 +194,16 @@ class Detected_Lane:
         shadow = self.shadow_HSV(warper_img)
         cv2.imshow('shadow', shadow)
 
-        test2_img = binHSV + shadow
-        cv2.imshow('test2_img', test2_img)
-
-        # binHSL = self.compute_hls_white_yellow_binary(warper_img)
-        # cv2.imshow('binHSL', binHSL)
-
-        sobel_img = self.calc_sobel(warper_img)
-        cv2.imshow('sobel_img', sobel_img)
-
-        splitShadow_img = self.splitShadow(sobel_img)
-        cv2.imshow('splitShadow_img', splitShadow_img)
-
-        canny_img = self.run_canny(warper_img)
-        cv2.imshow('canny_img', canny_img)
-
-        canny_splSd_img = np.bitwise_and(splitShadow_img, canny_img)
-        canny_bin_img = np.bitwise_and(binHSV, canny_img)
-        test1_img = canny_splSd_img + binHSV
-        cv2.imshow('test_img', test1_img)
-        cv2.imshow('canny_bin_img', canny_bin_img)
-
-        result_img = np.bitwise_and(splitShadow_img, test2_img)
+        result_img = binHSV + shadow
         cv2.imshow('result_img', result_img)
 
-        # combined_img = self.binaryPipeline(warper_img, show_images=True)
-        # cv2.imshow('combined_img', combined_img)
-
+        # combined_img = self.bin
         # test_img = cv2.bitwise_and(canny_img, combined_img)
-        left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(test2_img)
+        left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(result_img)
         
         # self.leftLine.__add_new_fit__(left_fit, left_fit_m)
         # self.rightLine.__add_new_fit__(right_fit, left_fit_m)
         cv2.imshow('out_img', out_img)
-
         cv2.waitKey(2)
 
     
