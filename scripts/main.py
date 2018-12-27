@@ -20,12 +20,15 @@ from std_msgs.msg import Float32
 from sensor_msgs.msg import CompressedImage   
 
 detect = detectlane.Detected_Lane()
-# car = carcontrol.CarControl()
+car = carcontrol.CarControl()
 
 def imageCallback(data):
     try:
+        cv2.waitKey(1)
         detect.__callback__(data)
-        # car.__driverCar__(detect.__get_left_line__(), detect.__get_right_line__())
+        # print(detect.__get_left_line__())
+        # print(detect.__get_right_line__())
+        car.__driverCar__(detect.__get_left_line__(), detect.__get_right_line__())
     except Exception:
         print(Exception)
 

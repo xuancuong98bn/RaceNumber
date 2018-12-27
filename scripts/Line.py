@@ -52,7 +52,7 @@ class Line():
         """
         
         # If this is our first line, then we will have to take it
-        if not self.current_fit_px and not self.previous_fits_px:
+        if self.current_fit_px == None and self.previous_fits_px == []:
             self.detected = True
             self.current_fit_px = new_fit_px
             self.current_fit_m = new_fit_m

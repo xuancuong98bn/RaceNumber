@@ -148,10 +148,10 @@ class Detected_Lane:
         right_fit = np.polyfit(righty, rightx, 2)
         
         # Fit a second order polynomial to each
-        left_fit_m = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
-        right_fit_m = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
-        # left_fit_m = []
-        # right_fit_m = []
+        # left_fit_m = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
+        # right_fit_m = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
+        left_fit_m = 0
+        right_fit_m = 0
 
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
@@ -159,10 +159,12 @@ class Detected_Lane:
         return left_fit, right_fit, left_fit_m, right_fit_m, out_img
 
     def __get_left_line__(self):
-        return self.leftLine.__get_line__()
+        current_fit_px, current_fit_m = self.leftLine.__get_line__()
+        return current_fit_px
     
     def __get_right_line__(self):
-        return self.rightLine.__get_line__()
+        current_fit_px, current_fit_m = self.rightLine.__get_line__()
+        return current_fit_px
 
     # callback function for processing image
     def __callback__(self, ros_data):
@@ -210,7 +212,7 @@ class Detected_Lane:
         self.leftLine.__add_new_fit__(left_fit, left_fit_m)
         self.rightLine.__add_new_fit__(right_fit, right_fit_m)
         cv2.imshow('out_img', out_img)
-        # cv2.waitKey(2)
+        cv2.waitKey(2)
 
     
 
