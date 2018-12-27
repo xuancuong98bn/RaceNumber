@@ -43,13 +43,16 @@ class Line():
         self.calc_best_fit()
         self.calc_radius()
         
+    def __get_line__(self):
+        return self.current_fit_px, self.current_fit_m
+
     def __add_new_fit__(self, new_fit_px, new_fit_m):
         """
         Add a new fit to the Line class
         """
         
         # If this is our first line, then we will have to take it
-        if self.current_fit_px == None and self.previous_fits_px == []:
+        if not self.current_fit_px and not self.previous_fits_px:
             self.detected = True
             self.current_fit_px = new_fit_px
             self.current_fit_m = new_fit_m
@@ -72,7 +75,7 @@ class Line():
 
             
     def diff_check(self):
-        if self.diffs[0] > 0.001:
+        if self.diffs[0] > 0.01:
             return True
         if self.diffs[1] > 0.25:
             return True

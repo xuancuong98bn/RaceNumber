@@ -43,32 +43,32 @@ class CarControl:
         return np.arctan(dx / dy) * 180 / pi;
     
 
-    def driverCar(self, velocity = 20):
-        # i = len(left) - 11
-        # error = self.preError
-        # while not left[i] and not right[i]:
-        #     i = i -1
-        #     if (i < 0):
-        #         return
-        # if (left[i] and right[i]):
-        #     error = self.errorAngle((left[i] + right[i]) / 2);
-        # elif left[i]:
-        #     error = self.errorAngle(left[i] + (self.laneWidth / 2, 0));
-        # else:
-        #     error = self.errorAngle(right[i] - (self.laneWidth / 2, 0));
+    def __driverCar__(self, left, right, velocity = 20):
+        i = len(left) - 11
+        error = self.preError
+        while not left[i] and not right[i]:
+            i = i -1
+            if (i < 0):
+                return
+        if (left[i] and right[i]):
+            error = self.errorAngle((left[i] + right[i]) / 2);
+        elif left[i]:
+            error = self.errorAngle(left[i] + (self.laneWidth / 2, 0));
+        else:
+            error = self.errorAngle(right[i] - (self.laneWidth / 2, 0));
 
-        # angle = error;
+        angle = error;
         speed = velocity;
 
-        self.steer_publisher.publish(0);
-        self.speed_publisher.publish(10);    
+        self.steer_publisher.publish(error);
+        self.speed_publisher.publish(velocity);    
 
 def main(args):
     rospy.init_node('carcontrol', anonymous=True)
     rate = rospy.Rate(10)
     cc = CarControl()
     while not rospy.is_shutdown():
-        cc.driverCar()
+        cc.__driverCar__()
         rate.sleep()
 
 if __name__ == '__main__':

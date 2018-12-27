@@ -23,8 +23,8 @@ class Detected_Lane:
 
     # constructor
     def __init__(self):
-        
-        self.subscriber = rospy.Subscriber("/Team1_image/compressed", CompressedImage, self.callback, queue_size = 1)
+        a = 1
+        # self.subscriber = rospy.Subscriber("/Team1_image/compressed", CompressedImage, self.__callback__, queue_size = 1)
         
     def warper(self, img, src, dst):        
         # Compute and apply perpective transform
@@ -79,7 +79,7 @@ class Detected_Lane:
         # Set the width of the windows +/- margin
         margin = 20
         # Set minimum number of pixels found to recenter window
-        minpix = 5
+        minpix = 10
 
 
         # Take a histogram of the bottom half of the image
@@ -119,8 +119,8 @@ class Detected_Lane:
             win_xright_low = rightx_current - margin
             win_xright_high = rightx_current + margin
             # Draw the windows on the visualization image
-            cv2.rectangle(out_img,(win_xleft_low,win_y_low),(win_xleft_high,win_y_high),(0,255,0), 2)
-            cv2.rectangle(out_img,(win_xright_low,win_y_low),(win_xright_high,win_y_high),(0,255,0), 2)
+            cv2.rectangle(out_img,(win_xleft_low,win_y_low),(win_xleft_high,win_y_high),(0,255,0), 1)
+            cv2.rectangle(out_img,(win_xright_low,win_y_low),(win_xright_high,win_y_high),(0,255,0), 1)
             # Identify the nonzero pixels in x and y within the window
             good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xleft_low) & (nonzerox < win_xleft_high)).nonzero()[0]
             good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
@@ -148,18 +148,24 @@ class Detected_Lane:
         right_fit = np.polyfit(righty, rightx, 2)
         
         # Fit a second order polynomial to each
-        # left_fit_m = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
-        # right_fit_m = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
-        left_fit_m = 0
-        right_fit_m = 0
+        left_fit_m = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
+        right_fit_m = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
+        # left_fit_m = []
+        # right_fit_m = []
 
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
         return left_fit, right_fit, left_fit_m, right_fit_m, out_img
 
+    def __get_left_line__(self):
+        return self.leftLine.__get_line__()
+    
+    def __get_right_line__(self):
+        return self.rightLine.__get_line__()
+
     # callback function for processing image
-    def callback(self, ros_data):
+    def __callback__(self, ros_data):
         # convert CompressedImage to int array
         np_arr = np.fromstring(ros_data.data, np.uint8)
 
@@ -201,10 +207,10 @@ class Detected_Lane:
         # test_img = cv2.bitwise_and(canny_img, combined_img)
         left_fit, right_fit, left_fit_m, right_fit_m, out_img = self.calc_line_fits(result_img)
         
-        # self.leftLine.__add_new_fit__(left_fit, left_fit_m)
-        # self.rightLine.__add_new_fit__(right_fit, left_fit_m)
+        self.leftLine.__add_new_fit__(left_fit, left_fit_m)
+        self.rightLine.__add_new_fit__(right_fit, right_fit_m)
         cv2.imshow('out_img', out_img)
-        cv2.waitKey(2)
+        # cv2.waitKey(2)
 
     
 
