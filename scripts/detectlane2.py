@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 # The above line is essential for ros python file
-# Use equation axx+bx+c
+# Use equation ax+b
+
 import sys, time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -40,7 +41,6 @@ class Detected_Lane:
         unwarped = cv2.warpPerspective(img, Minv, img_size)
         return unwarped
 
-    
     def gaussian_blur(self, img, kernel_size=5):
         return cv2.GaussianBlur(img, (kernel_size, kernel_size), 0)
 
@@ -59,13 +59,9 @@ class Detected_Lane:
         maxLaneInShadow = (120, 80, 171)
 
         imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV);
-
         shadowMask = cv2.inRange(imgHSV, minShadowTh, maxShadowTh)
-
         shadow = cv2.bitwise_and(img,img, mask= shadowMask)
-
         shadowHSV = cv2.cvtColor(shadow, cv2.COLOR_BGR2HSV);
-
         out = cv2.inRange(shadowHSV, minLaneInShadow, maxLaneInShadow)
         return out
 
