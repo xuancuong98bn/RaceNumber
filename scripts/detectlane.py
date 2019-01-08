@@ -20,6 +20,7 @@ from sensor_msgs.msg import CompressedImage
 class Detected_Lane:
     leftLine = Line.Line()
     rightLine = Line.Line()
+    space_accept = []
 
     # constructor
     def __init__(self):
@@ -45,8 +46,8 @@ class Detected_Lane:
         return cv2.GaussianBlur(img, (kernel_size, kernel_size), 0)
 
     def binary_HSV(self, img):
-        minThreshold = (0, 0, 180);
-        maxThreshold = (179, 30, 255);
+        minThreshold = (0, 0, 180)
+        maxThreshold = (179, 30, 255)
         hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
         out = cv2.inRange(hsv_img, minThreshold, maxThreshold)
         return out
@@ -81,7 +82,7 @@ class Detected_Lane:
         # Set minimum number of pixels found to recenter window
         minpix = 10
 
-
+        height, width = img.shape
         # Take a histogram of the bottom half of the image
         histogram = np.sum(img[img.shape[0]//2:,:], axis=0)
 
@@ -109,15 +110,30 @@ class Detected_Lane:
         left_lane_inds = []
         right_lane_inds = []
 
+        min_x_left = width
+        max_x_left = 0
+        min_x_right = width
+        max_x_right = 0
+        min_x_mid = width
+        max_x_mid = 0
+
         # Step through the windows one by one
         for window in range(nwindows):
             # Identify window boundaries in x and y (and right and left)
             win_y_low = img.shape[0] - (window+1)*window_height
             win_y_high = img.shape[0] - window*window_height
             win_xleft_low = leftx_current - margin
+            if leftx_current < min_x_left:
+                min_x_left = leftx_current
             win_xleft_high = leftx_current + margin
+            if leftx_current > max_x_left:
+                max_x_left = leftx_current
             win_xright_low = rightx_current - margin
+            if rightx_current < min_x_right:
+                min_x_right = rightx_current
             win_xright_high = rightx_current + margin
+            if rightx_current > max_x_right:
+                max_x_right = rightx_current
             # Draw the windows on the visualization image
             cv2.rectangle(out_img,(win_xleft_low,win_y_low),(win_xleft_high,win_y_high),(0,255,0), 1)
             cv2.rectangle(out_img,(win_xright_low,win_y_low),(win_xright_high,win_y_high),(0,255,0), 1)
@@ -136,7 +152,10 @@ class Detected_Lane:
         # Concatenate the arrays of indices
         left_lane_inds = np.concatenate(left_lane_inds)
         right_lane_inds = np.concatenate(right_lane_inds)
-        
+        self.space_accept.append(min_x_left)
+        self.space_accept.append(max_x_left)
+        self.space_accept.append(min_x_right)
+        self.space_accept.append(max_x_right)
         # Extract left and right line pixel positions
         leftx = nonzerox[left_lane_inds]
         lefty = nonzeroy[left_lane_inds]
@@ -154,12 +173,12 @@ class Detected_Lane:
         # Fit a second order polynomial to each
         try:
             left_fit = np.polyfit(leftx, lefty, 2)
-        except Exception:
+        except np.RankWarning:
             left_fit = None
 
         try:
             right_fit = np.polyfit(rightx, righty, 2)
-        except Exception:
+        except np.RankWarning:
             right_fit = None
 
         # print(left_fit)
@@ -183,6 +202,9 @@ class Detected_Lane:
         best_fit_px, best_fit_m = self.rightLine.__get_line__()
         return best_fit_px
     
+    def __get_space_accept__(self):
+        return self.space_accept
+
     def draw_arrpoint(self,img,arr,color=(0,0,255)):
         canvas = img.copy()
         for m in arr:
@@ -213,7 +235,7 @@ class Detected_Lane:
         image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
         SKY_LINE = 90
-        CAR_LINE = 15
+        CAR_LINE = 0
         HALF_ROAD = 30
         height,width = image_np.shape[:2]
         IMAGE_H = height - SKY_LINE - CAR_LINE
@@ -251,9 +273,17 @@ class Detected_Lane:
         self.rightLine.__add_new_fit__(right_fit, right_fit_m)
         cv2.imshow('out_img', out_img)
 
+        # d,e,f = left_fit
+        # x,y,z = right_fit
+
+        # m = 2*d*x
+        # n = e*x+y*d
+        # r = e*y/4+x*f/2+d*z/2-np.sqrt((e**2-4*d*f)*(y**2-4*x*z)/2)
+        # mid = m,n,r
         canvas = np.zeros_like(out_img)
         canvas = self.draw_quadratic(canvas,left_fit)
         canvas = self.draw_quadratic(canvas,right_fit,color=(255,0,0))
+        # canvas = self.draw_quadratic(canvas,mid,(0,255,0))
         cv2.imshow('canvas',canvas)
 
         arrr = np.zeros_like(out_img)

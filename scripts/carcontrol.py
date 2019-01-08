@@ -35,94 +35,63 @@ class CarControl:
         self.laneWidth = 70
         self.preLeft = 120 
         self.preRight = 190
-        self.carPos = (160., 208.)
+        self.carPos = (160., 239.)
         self.steer_publisher = rospy.Publisher('Team1_steerAngle', Float32, queue_size=10)
         self.speed_publisher = rospy.Publisher('Team1_speed', Float32, queue_size=10)
 
-    def errorAngle(self, left = None, right = None):
-        print(left)
-        print(right)
+    def errorAngle(self):
         mid = self.preMid
-        if left is not None and right is not None:
-            mid = (left + right)/2
-        elif left is not None:
-            mid = left + 35
-        elif right is not None:
-            mid = right - 35
-        self.preMid = mid
         pi = np.arccos(-1.0)
         dx = mid - self.carPos[0]
-        dy = self.carPos[1] - 170
+        dy = self.carPos[1] - 200
         if dx < 0:
             current_angle = -np.arctan(-dx / dy) * 180 / pi
-        else: 
+        elif dx > 0: 
             current_angle = np.arctan(dx / dy) * 180 / pi
-        angle = (2* self.preError + current_angle)/3
-        return angle, 50*(1-np.abs(angle/90))
+        angle = (self.preError + current_angle)/2
+        return angle, 30
     
 
-    def __driverCar__(self, left = [], right = [], velocity = 30.):
-        # print(left)
-        # print(right)
+    def __driverCar__(self, left, right, space_accept = [], velocity = 30.):
+        print("==")
+        print(left)
+        print(right)
         error = self.preError
-        velocity = self.preVeloc        
-        if left is not None and right is not None:
-            print("both")
-            c1 = left[2]-170
-            c2 = right[2]-170
-            delta_left = left[1]*left[1] - 4*left[0]*c1
-            delta_right = right[1]*right[1] - 4*right[0]*c2
-            x1_left = np.round((-left[1]+np.sqrt(delta_left))/(2*left[0]))
-            x2_left = np.round((-left[1]-np.sqrt(delta_left))/(2*left[0]))
-            x1_right = np.round((-right[1]+np.sqrt(delta_right))/(2*right[0]))
-            x2_right = np.round((-right[1]-np.sqrt(delta_right))/(2*right[0]))
-            print(x1_left)
-            print(x2_left)
-            print(x1_right)
-            print(x2_right)
-            if x1_left > 0 and x1_right > 0 and x1_right > x1_left and x1_right - x1_left < 90:
-                print("1")
-                self.preLeft = x1_left
-                self.preRight = x1_right
-            elif x1_left > self.preLeft-10 and x2_right < self.preRight+10 and x2_right > x1_left and x2_right - x1_left < 90:
-                print("2")
-                self.preLeft = x1_left
-                self.preRight = x2_right
-            elif x2_left > self.preLeft-10 and x1_right < self.preRight+10 and x1_right > x2_left and x1_right - x2_left < 90:
-                print("3")
-                self.preLeft = x2_left
-                self.preRight = x1_right
-            elif x2_left > self.preLeft-10 and x2_right < self.preRight+10 and x2_right > x2_left and x2_right - x2_left < 90:
-                print("4")
-                self.preLeft = x2_left
-                self.preRight = x2_right
-            error, velocity = self.errorAngle(self.preLeft, self.preRight)
-        elif left is not None:
-            print("left")
-            c1 = left[2]-170
-            delta_left = left[1]*left[1] - 4*left[0]*c1
-            x1_left = np.round((-left[1]+np.sqrt(delta_left))/(2*left[0]))
-            x2_left = np.round((-left[1]-np.sqrt(delta_left))/(2*left[0]))
-            if x1_left >=0:
-                error, velocity = self.errorAngle(x1_left)
-            else:   
-                error, velocity = self.errorAngle(x2_left) 
-        elif right is not None:
-            print("right")
-            c2 = left[2]-170
-            delta_right = right[1]*right[1] - 4*right[0]*c2
-            x1_right = np.round((-right[1]+np.sqrt(delta_right))/(2*right[0]))
-            x2_right = np.round((-right[1]-np.sqrt(delta_right))/(2*right[0]))
-            if x1_right >= 0:
-                error, velocity = self.errorAngle(None, x1_right)
-            else:
-                error, velocity = self.errorAngle(None, x2_right)
-        print(error)
-        print(velocity)
-        self.preError = error
-        self.preVeloc = velocity
-        self.steer_publisher.publish(error);
-        self.speed_publisher.publish(velocity); 
+        velocity = self.preVeloc
+        try:     
+            #     a,b,c = left
+            #     x,y,z = right
+            #     m = 2*a*x
+            #     n = b*x+y*a
+            #     r = b*y/4+x*c/2+a*z/2-np.sqrt((b**2-4*a*c)*(y**2-4*x*z)/2)
+            if left is not None:
+                a,b,c = left
+                cleft = c-200
+                delta_left = b**2 - 4*a*cleft
+                x1_left = np.round((-b+np.sqrt(delta_left))/(2*a))
+                x2_left = np.round((-b-np.sqrt(delta_left))/(2*a))
+                self.preLeft = x1_left if x1_left > space_accept[0] and x1_left < space_accept[1] else x2_left
+
+            if right is not None:
+                a,b,c = right
+                cright = c-200
+                delta_right = b**2 - 4*a*cright
+                x1_right = np.round((-b+np.sqrt(delta_right))/(2*a))
+                x2_right = np.round((-b-np.sqrt(delta_right))/(2*a))
+                self.preRight = x1_right if x1_right > space_accept[2] and x1_right < space_accept[3] else x2_right
+    
+            print(self.preLeft)
+            print(self.preRight)
+            self.preMid = (self.preLeft+self.preRight)/2
+            print(self.preMid)
+            error, velocity = self.errorAngle()
+            print(error)
+            self.preError = error
+            self.preVeloc = velocity
+        except Exception:
+            print("huhu")
+        self.steer_publisher.publish(self.preError);
+        self.speed_publisher.publish(self.preVeloc); 
 
 def main(args):
     rospy.init_node('carcontrol', anonymous=True)

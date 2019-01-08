@@ -8,8 +8,8 @@ import numpy as np
 # import ros libraries
 import rospy
 import roslib
-import detectlane
-import carcontrol
+import detectlane2
+import carcontrol2
 
 # import opencv
 import cv2
@@ -19,8 +19,8 @@ from std_msgs.msg import Float32
 # import type CompressedImage from sensor_msgs
 from sensor_msgs.msg import CompressedImage   
 
-detect = detectlane.Detected_Lane()
-car = carcontrol.CarControl()
+detect = detectlane2.Detected_Lane()
+car = carcontrol2.CarControl()
 
 def imageCallback(data):
     try:
@@ -28,7 +28,7 @@ def imageCallback(data):
         detect.__callback__(data)
         # print(detect.__get_left_line__())
         # print(detect.__get_right_line__())
-        car.__driverCar__(detect.__get_left_line__(), detect.__get_right_line__(), detect.__get_space_accept__())
+        car.__driverCar__(detect.__get_left_line__(), detect.__get_right_line__(), detect.__get_check_point__())
     except Exception:
         print(Exception)
 
@@ -37,7 +37,6 @@ def main(args):
     subscriber = rospy.Subscriber("/Team1_image/compressed", CompressedImage, imageCallback, queue_size = 1)
     rospy.init_node('mynode', anonymous=True)
     try:
-        rospy.sleep(1)
         rospy.spin()
     except KeyboardInterrupt:
         print "Closing"

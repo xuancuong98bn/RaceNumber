@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # import ros libraries
 import rospy
 import roslib
-import Line
+import Line2
 
 # import opencv
 import cv2
@@ -19,8 +19,9 @@ import cv2
 from sensor_msgs.msg import CompressedImage
 
 class Detected_Lane:
-    leftLine = Line.Line()
-    rightLine = Line.Line()
+    leftLine = Line2.Line()
+    rightLine = Line2.Line()
+    check_point = []
 
     # constructor
     def __init__(self):
@@ -71,7 +72,7 @@ class Detected_Lane:
         xm_per_pix = 3.7/550 # meters per pixel in x dimension, lane width is 12 ft = 3.7 meters
         ### Settings
         # Choose the number of sliding windows
-        nwindows = 9
+        nwindows = 1
         # Set the width of the windows +/- margin
         margin = 20
         # Set minimum number of pixels found to recenter window
@@ -93,6 +94,7 @@ class Detected_Lane:
         rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
         # Set height of windows
+        height = img.shape[0]
         window_height = np.int(img.shape[0]/nwindows)
         # Identify the x and y positions of all nonzero pixels in the image
         nonzero = img.nonzero()
@@ -102,9 +104,9 @@ class Detected_Lane:
         leftx_current = leftx_base
         rightx_current = rightx_base
         # Create empty lists to receive left and right lane pixel indices
-        left_lane_inds = []
-        right_lane_inds = []
-
+        left_lane_equation = []
+        right_lane_equation = []
+        check_point = [img.shape[0]]
         # Step through the windows one by one
         for window in range(nwindows):
             # Identify window boundaries in x and y (and right and left)
@@ -114,15 +116,28 @@ class Detected_Lane:
             win_xleft_high = leftx_current + margin
             win_xright_low = rightx_current - margin
             win_xright_high = rightx_current + margin
+
+            check_point.append(win_y_low)
             # Draw the windows on the visualization image
             cv2.rectangle(out_img,(win_xleft_low,win_y_low),(win_xleft_high,win_y_high),(0,255,0), 1)
             cv2.rectangle(out_img,(win_xright_low,win_y_low),(win_xright_high,win_y_high),(0,255,0), 1)
             # Identify the nonzero pixels in x and y within the window
             good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xleft_low) & (nonzerox < win_xleft_high)).nonzero()[0]
             good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
+            # Change to x, y index
+            leftx = nonzerox[good_left_inds]
+            lefty = nonzeroy[good_left_inds]
+            rightx = nonzerox[good_right_inds]
+            righty = nonzeroy[good_right_inds]
+            # Create quation with each window
+            leftx_fix, lefty_fix, left_fix = self.fix_line(leftx, lefty, height)
+            rightx_fix, righty_fix, right_fix = self.fix_line(rightx, righty, height)
+
+            left_equation = np.polyfit(leftx_fix, lefty_fix, 1)
+            right_equation = np.polyfit(rightx_fix, righty_fix, 1)
             # Append these indices to the lists
-            left_lane_inds.append(good_left_inds)
-            right_lane_inds.append(good_right_inds)
+            left_lane_equation.append(left_equation)
+            right_lane_equation.append(right_equation)
             # If you found > minpix pixels, recenter next window on their mean position
             if len(good_left_inds) > minpix:
                 leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
@@ -130,55 +145,47 @@ class Detected_Lane:
                 rightx_current = np.int(np.mean(nonzerox[good_right_inds]))
 
         # Concatenate the arrays of indices
-        left_lane_inds = np.concatenate(left_lane_inds)
-        right_lane_inds = np.concatenate(right_lane_inds)
+        # left_lane_equation = np.concatenate(left_lane_equation)
+        # right_lane_equation = np.concatenate(right_lane_equation)
+
         
-        # Extract left and right line pixel positions
-        leftx = nonzerox[left_lane_inds]
-        lefty = nonzeroy[left_lane_inds]
-        rightx = nonzerox[right_lane_inds]
-        righty = nonzeroy[right_lane_inds]
-
-        a = np.column_stack((leftx,lefty))
-        b = np.column_stack((rightx,righty))
-        # print(a)
-        # print(b)
-        # cv2.polylines(img, a, True, (255,0,0), 1)
-        # cv2.polylines(img, b, True, (0,0,255), 1)
-        # cv2.imshow('img', img)
-        
-        # Fit a second order polynomial to each
-        try:
-            left_fit = np.polyfit(leftx, lefty, 2)
-        except Exception:
-            left_fit = None
-
-        try:
-            right_fit = np.polyfit(rightx, righty, 2)
-        except Exception:
-            right_fit = None
-
-        # print(left_fit)
-        # print(right_fit)
         # Fit a second order polynomial to each
         # left_fit_m = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
         # right_fit_m = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
         left_fit_m = 0
         right_fit_m = 0
 
-        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        return left_lane_equation, right_lane_equation, left_fit_m, right_fit_m, out_img, check_point
 
-        return left_fit, right_fit, left_fit_m, right_fit_m, out_img, a, b
+    def fix_line(seft, linex, liney, height):
+        line_fix = []
+        linex_fix = []
+        liney_fix = []
+        for i in range(height):
+                temp_list = []
+                check = False
+                for j in range(len(liney)):
+                    if i == liney[j]:
+                        temp_list.append(linex[j])
+                        check = True
+                if check:
+                    x = np.mean(temp_list)
+                    line_fix.append([x,i])
+                    linex_fix.append(x)
+                    liney_fix.append(i)
+        return linex_fix, liney_fix, line_fix
 
     def __get_left_line__(self):
-        best_fit_px, best_fit_m = self.leftLine.__get_line__()
-        return best_fit_px
+        best_fit_equation, check_point = self.leftLine.__get_line__()
+        return best_fit_equation
     
     def __get_right_line__(self):
-        best_fit_px, best_fit_m = self.rightLine.__get_line__()
-        return best_fit_px
+        best_fit_equation, check_point = self.rightLine.__get_line__()
+        return best_fit_equation
     
+    def __get_check_point__(self):
+        return self.check_point
+
     def draw_arrpoint(self,img,arr,color=(0,0,255)):
         canvas = img.copy()
         for m in arr:
@@ -187,17 +194,15 @@ class Detected_Lane:
             canvas[y][x] = color
         return canvas
 
-    def draw_quadratic(self,img,abc,color=(0,0,255)):
+    def draw_line(self,img,lane_equation,color=(0,0,255)):
         canvas = img.copy()
         height,width = canvas.shape[:2]
-
-        a,b,c = abc
-
-        for x in range(width):
-            y = int(a* x**2 + b* x + c)
-            if y >= 0 and y < height:
-                canvas[y][x] = color
-
+        for i in range(len(self.check_point)-1):
+            a = lane_equation[i][0]
+            b = lane_equation[i][1]
+            x1 = int((self.check_point[i] - b) / a)
+            x2 = int((self.check_point[i+1] - b) / a)
+            cv2.line(canvas, (x1,self.check_point[i]), (x2,self.check_point[i+1]), color)
         return canvas
 
     # callback function for processing image
@@ -209,7 +214,7 @@ class Detected_Lane:
         image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
         SKY_LINE = 90
-        CAR_LINE = 15
+        CAR_LINE = 0
         HALF_ROAD = 30
         height,width = image_np.shape[:2]
         IMAGE_H = height - SKY_LINE - CAR_LINE
@@ -241,21 +246,21 @@ class Detected_Lane:
 
         # combined_img = self.bin
         # test_img = cv2.bitwise_and(canny_img, combined_img)
-        left_fit, right_fit, left_fit_m, right_fit_m, out_img,a,b = self.calc_line_fits(result_img)
-        
-        self.leftLine.__add_new_fit__(left_fit, left_fit_m)
-        self.rightLine.__add_new_fit__(right_fit, right_fit_m)
+        left_lane_equation, right_lane_equation, left_fit_m, right_fit_m, out_img, check_point = self.calc_line_fits(result_img)
+        self.leftLine.__add_new_fit__(left_lane_equation, left_fit_m, check_point)
+        self.rightLine.__add_new_fit__(right_lane_equation, right_fit_m, check_point)
         cv2.imshow('out_img', out_img)
+        self.check_point = check_point
 
         canvas = np.zeros_like(out_img)
-        canvas = self.draw_quadratic(canvas,left_fit)
-        canvas = self.draw_quadratic(canvas,right_fit,color=(255,0,0))
+        canvas = self.draw_line(canvas,left_lane_equation)
+        canvas = self.draw_line(canvas,right_lane_equation,color=(255,0,0))
         cv2.imshow('canvas',canvas)
 
-        arrr = np.zeros_like(out_img)
-        arrr = self.draw_arrpoint(arrr,a)
-        arrr = self.draw_arrpoint(arrr,b,color=(255,0,0))
-        cv2.imshow('arrr',arrr)
+        # arrr = np.zeros_like(out_img)
+        # arrr = self.draw_arrpoint(arrr,a)
+        # arrr = self.draw_arrpoint(arrr,b,color=(255,0,0))
+        # cv2.imshow('arrr',arrr)
         cv2.waitKey(2)
 
     
